@@ -1,0 +1,172 @@
+version: "3"
+services:
+
+  # Home automation
+
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:stable
+    volumes:
+      - "${SERVICES_DATA_DIR}/home-assistant:/config"
+      - /etc/localtime:/etc/localtime:ro
+    network_mode: host
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto:latest
+    volumes:
+      - "${SERVICES_DATA_DIR}/mosquitto/config:/mosquitto/config"
+      - "${SERVICES_DATA_DIR}/mosquitto/data:/mosquitto/data"
+      - "${SERVICES_DATA_DIR}/mosquitto/log:/mosquitto/log"
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    restart: unless-stopped
+
+
+  # Media automation
+
+  radarr:
+    container_name: radarr
+    image: lscr.io/linuxserver/radarr:arm64v8-latest
+    ports:
+      - "7878:7878"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Argentina/Buenos_Aires
+    volumes:
+      - "${SERVICES_DATA_DIR}/radarr/config:/config"
+      - "${SHARED_DATA_DIR}/Movies:/movies"
+      - "${BASE_DATA_DIR}/Torrent temp:/downloads"
+    network_mode: host
+    depends_on:
+      - transmission
+      - jackett
+    restart: unless-stopped
+
+  sonarr:
+    container_name: sonarr
+    image: lscr.io/linuxserver/sonarr:arm64v8-latest
+    ports:
+      - "8989:8989"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Argentina/Buenos_Aires
+    volumes:
+      - "${SERVICES_DATA_DIR}/sonarr/config:/config"
+      - "${SHARED_DATA_DIR}/TV Series:/tv"
+      - "${BASE_DATA_DIR}/Torrent temp:/downloads"
+    network_mode: host
+    depends_on:
+      - transmission
+      - jackett
+    restart: unless-stopped
+
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    container_name: jackett
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Argentina/Buenos_Aires
+    volumes:
+      - "${SERVICES_DATA_DIR}/jackett/config:/config"
+      - "${BASE_DATA_DIR}/Torrent temp:/downloads"
+    ports:
+      - "9117:9117"
+    restart: unless-stopped
+
+  # lazylibrarian:
+  #   image: lscr.io/linuxserver/lazylibrarian:latest
+  #   container_name: lazylibrarian
+  #   environment:
+  #     - PUID=1000
+  #     - PGID=1000
+  #     - TZ=America/Argentina/Buenos_Aires
+  #   volumes:
+  #     - "${SERVICES_DATA_DIR}/lazylibrarian:/config"
+  #     - "${BASE_DATA_DIR}/Torrent temp:/downloads"
+  #     - "${SHARED_DATA_DIR}/Books:/books" #optional
+  #   ports:
+  #     - 5299:5299
+  #   restart: unless-stopped
+
+  # Downloads
+
+  transmission:
+    container_name: transmission
+    image: lscr.io/linuxserver/transmission:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - USER=transmission
+      - PASS=eLfBBd3hWpLh5NNgSHfdwsYtSpD5uG
+      - TZ=America/Argentina/Buenos_Aires
+    volumes:
+      - "${SERVICES_DATA_DIR}/transmission:/config"
+      - "${BASE_DATA_DIR}/Torrent temp:/downloads"
+    ports:
+      - "9091:9091"
+      - "51413:51413"
+      - "51413:51413/udp"
+    restart: unless-stopped
+
+  # amule:
+  #   container_name: amule
+  #   image: synopsis8/raspberrypi3-amule:raspberry
+  #   environment:
+  #     # GUI_PWD and WEBUI_PWD are only used in initial setup
+  #     - GUI_PWD=password
+  #     - WEBUI_PWD=password
+  #   ports:
+  #     - "4711:4711" # web ui
+  #     - "4712:4712" # remote gui, webserver, cmd ...
+  #     - "4665:4665"
+  #     - "4672:4672"
+  #     - "8004:8004"
+  #     - "8006:8006/udp" # ed2k global search udp (tcp port +3)
+  #     - "8007:8007/udp" # ed2k udp
+  #   volumes:
+  #     - "${SERVICES_DATA_DIR}/amule:/home/amule/.aMule"
+  #     - "${BASE_DATA_DIR}/eMule/incoming:/incoming"
+  #     - "${BASE_DATA_DIR}/eMule/temp:/temp"
+  #   restart: unless-stopped
+
+  # Cloud 
+
+  nextcloud-db:
+    container_name: nextcloud-db
+    image: postgres
+    environment:
+      - POSTGRES_USER=$NEXTCLOUD_DB_USER
+      - POSTGRES_PASSWORD=$NEXTCLOUD_DB_PASSWORD
+      - POSTGRES_DB=nextcloud
+    volumes:
+      - "${SERVICES_DATA_DIR}/nextcloud/db:/var/lib/postgresql/data"
+    restart: unless-stopped
+  
+  nextcloud:
+    container_name: nextcloud
+    image: nextcloud
+    environment:
+      - NEXTCLOUD_ADMIN_USER=$NEXTCLOUD_ADMIN_USER
+      - NEXTCLOUD_ADMIN_PASSWORD=$NEXTCLOUD_ADMIN_PASSWORD
+      - POSTGRES_DB=nextcloud
+      - POSTGRES_USER=$NEXTCLOUD_DB_USER
+      - POSTGRES_PASSWORD=$NEXTCLOUD_DB_PASSWORD
+      - POSTGRES_HOST=nextcloud-db
+    ports:
+      - 9191:80
+    volumes:
+      - "${SERVICES_DATA_DIR}/nextcloud/web:/var/www/html"
+      - "${SERVICES_DATA_DIR}/nextcloud/config:/var/www/html/config"
+      - "${SERVICES_DATA_DIR}/nextcloud/apps:/var/www/html/custom_apps"
+      - "${SERVICES_DATA_DIR}/nextcloud/data:/var/www/html/data"
+    depends_on:
+      - nextcloud-db
+    restart: unless-stopped
