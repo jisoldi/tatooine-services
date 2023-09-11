@@ -167,6 +167,7 @@ services:
       - "${SERVICES_DATA_DIR}/nextcloud/config:/var/www/html/config"
       - "${SERVICES_DATA_DIR}/nextcloud/apps:/var/www/html/custom_apps"
       - "${SERVICES_DATA_DIR}/nextcloud/data:/var/www/html/data"
+      - "${BACKUP_DIR}/nextcloud-backup:/var/backup"
     depends_on:
       - nextcloud-db
     restart: unless-stopped
